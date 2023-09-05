@@ -19,6 +19,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -40,11 +41,12 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 ImageView image;
+float x, y, z, w;
     private List<File> imageFiles = new ArrayList<>();
     private List<File> textFiles = new ArrayList<>();
     private static final int REQUEST_CODE_PERMISSION = 1001;
 Button save_btn;
-    @SuppressLint("MissingInflatedId")
+    @SuppressLint({"MissingInflatedId", "ClickableViewAccessibility"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,67 +54,87 @@ Button save_btn;
         image= findViewById(R.id.image);
         save_btn= findViewById(R.id.saving_btn);
         checkAndRequestPermission();
-        save_btn. setOnClickListener(new View.OnClickListener() {
+//        image.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                switch (event.getAction()) {
+//                    case MotionEvent.ACTION_DOWN:
+//                        // Capture the touch coordinates when the user touches the image
+//                        x = event.getX();
+//                        y = event.getY();
+//                        break;
+//                    case MotionEvent.ACTION_UP:
+//                        // Capture the touch coordinates when the user releases the touch
+//                        z = event.getX();
+//                        w = event.getY();
+//                        break;
+//                }
+//                return true;
+//            }
+//        });
+        save_btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                    saveImage();
+                // Check if valid touch coordinates have been captured
+                if (x != -1 && y != -1 && z != -1 && w != -1) {
+                    saveData(image, x, y, z, w);
+                } else {
+                    Toast.makeText(MainActivity.this, "Please interact with the image to capture coordinates.", Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
     }
-    private void saveImage() {
-        // Get the drawable from the ImageView
+
+
+
+
+    private void saveData(ImageView image, float x, float y, float z, float w) {
         BitmapDrawable drawable = (BitmapDrawable) image.getDrawable();
         Bitmap bitmap = drawable.getBitmap();
-        // Define a filename for the saved image
+
         String fileName = "Image" + imageFiles.size() + ".jpg";
-        // Get the internal storage directory specific to this app
+
         File mainDirectory = new File(Environment.getExternalStorageDirectory(), Environment.DIRECTORY_DOCUMENTS);
-        // Create main 'data' directory if it doesn't exist
+
         if (!mainDirectory.exists()) {
             mainDirectory.mkdir();
             Log.d("image saver", "saveImage: main " + mainDirectory);
         }
-        // Create 'images' subdirectory inside 'data'
-        File imagesDirectory = new File(mainDirectory, "images");
-        if (!imagesDirectory.exists()) {
-            imagesDirectory.mkdir();
-            Log.d("image saver", "saveImage: image" + imagesDirectory);
-        }
-        // Create 'texts' subdirectory inside 'data' (if you need it later)
-        File textsDirectory = new File(mainDirectory, "texts");
-        if (!textsDirectory.exists()) {
-            textsDirectory.mkdir();
-            Log.d("image saver", "saveImage: text " + textsDirectory);
-        }
-        // Create a new file in the 'images' directory
-        File imageFile = new File(imagesDirectory, fileName);
+
+        File imageFile = new File(mainDirectory, fileName);
         try {
-            // Open an output stream to save the image to the file
             FileOutputStream fos = new FileOutputStream(imageFile);
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-            // Flush and close the output stream
             fos.flush();
             fos.close();
 
-            // Create a text file with the same name as the image file
-            String textFileName = fileName.replace(".jpg", ".txt");
-            File textFile = new File(textsDirectory, textFileName);
-            textFile.createNewFile();
+//            String textFileName = fileName.replace(".jpg", ".txt");
+//            File textFile = new File(mainDirectory, textFileName);
 
-            // Add the image and text files to the lists
+            // Calculate normalized coordinates and dimensions
+            int imageWidth = image.getWidth();
+            int imageHeight = image.getHeight();
+            float normalizedX = x / imageWidth;
+            float normalizedY = y / imageHeight;
+            float normalizedWidth = z / imageWidth;
+            float normalizedHeight = w / imageHeight;
+
+            // Prepare the data line for the text file
+            String coordinatesData = normalizedX + "\t" + normalizedY + "\t" + normalizedWidth + "\t" + normalizedHeight;
+            FileOutputStream textFos = new FileOutputStream(imageFile.getAbsolutePath().replace(".jpg", ".txt"));
+            textFos.write(coordinatesData.getBytes());
+            textFos.close();
+
             imageFiles.add(imageFile);
-            textFiles.add(textFile);
+           // textFiles.add(textFile);
 
-            // Display a toast message to indicate the image and text save locations
-            Toast.makeText(this, "Image saved to " + imageFile.getAbsolutePath() + "\nText saved to " + textFile.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Image and Text saved to " + mainDirectory.getAbsolutePath(), Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
-            // Log the exception and display a toast message
             e.printStackTrace();
-            Toast.makeText(this, "Failed to save image.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Failed to save image or data." + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
- 
 
     private void checkAndRequestPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.MANAGE_EXTERNAL_STORAGE)
@@ -121,7 +143,8 @@ Button save_btn;
                     new String[]{Manifest.permission.MANAGE_EXTERNAL_STORAGE},
                     REQUEST_CODE_PERMISSION);
         } else {
-            saveImage();
+            saveData(image,x,y,z,w);
+           // saveImage();
         }
     }
 
@@ -130,7 +153,9 @@ Button save_btn;
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CODE_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                saveImage();
+
+                saveData(image,x,y,z,w);
+                //saveImage();
             } else {
                 Toast.makeText(this, "Permission denied. Cannot save image ....", Toast.LENGTH_SHORT).show();
             }

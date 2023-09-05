@@ -9,10 +9,10 @@
     tools:context=".MainActivity">
 
    <ImageView
-       android:layout_width="wrap_content"
+       android:layout_width="360dp"
        android:layout_height="500dp"
        android:id="@+id/image"
-       android:src="@drawable/img"
+       android:src="@drawable/image"
        android:scaleType="fitXY"
        tools:ignore="MissingConstraints" />
    <Button
